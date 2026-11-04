@@ -76,4 +76,3 @@ npu_vmac_sat_i16_avx2:
 #if defined(__ELF__)
         .size   npu_vmac_sat_i16_avx2, .-npu_vmac_sat_i16_avx2
 #endif
-        .section .note.GNU-stack,"",@progbits
