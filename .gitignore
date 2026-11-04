@@ -1,0 +1,10 @@
+build/
+build-*/
+*.o
+*.obj
+*.a
+*.exe
+*.gcda
+*.gcno
+.cache/
+compile_commands.json

@@ -1,0 +1,39 @@
+name: CI
+
+# Build, bit-exact verification, and performance gate for npu-hotspot-asm.
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.os }} / ${{ matrix.cc }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest ]
+        cc: [ gcc, clang ]
+    env:
+      CC: ${{ matrix.cc }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang
+        if: matrix.cc == 'clang'
+        run: sudo apt-get update && sudo apt-get install -y clang
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release -j
+
+      - name: Test (bit-exact verification)
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Benchmark (performance gate)
+        # 1.5x is a conservative floor; AVX2 should beat the scalar oracle by
+        # far more. The gate is skipped automatically when AVX2 is absent.
+        run: NPU_MIN_SPEEDUP=1.5 ./build/npu_bench
