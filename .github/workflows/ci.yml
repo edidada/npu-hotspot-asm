@@ -1,6 +1,5 @@
 name: CI
 
-# Build, bit-exact verification, and performance gate for npu-hotspot-asm.
 on:
   push:
     branches: [ main, master ]
@@ -24,14 +23,17 @@ jobs:
         if: matrix.cc == 'clang'
         run: sudo apt-get update && sudo apt-get install -y clang
 
+      - name: Install gdb
+        run: sudo apt-get update && sudo apt-get install -y gdb
+
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         run: cmake --build build --config Release -j
 
-      - name: Test (bit-exact verification)
-        run: ./build/npu_tests
+      - name: Test (bit-exact verification, with gdb backtrace)
+        run: gdb -batch -ex run -ex bt -ex "x/8i \$pc" --args ./build/npu_tests
 
       - name: Benchmark (performance gate)
         run: NPU_MIN_SPEEDUP=1.5 ./build/npu_bench
