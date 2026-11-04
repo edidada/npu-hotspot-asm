@@ -7,7 +7,7 @@
 #   - npu_hotspot_asm    : hand-written AVX2 assembly backends (Linux/x86_64)
 # =============================================================================
 cmake_minimum_required(VERSION 3.16)
-project(npu_hotspot_asm C)
+project(npu_hotspot_asm C ASM)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
