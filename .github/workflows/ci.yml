@@ -31,9 +31,7 @@ jobs:
         run: cmake --build build --config Release -j
 
       - name: Test (bit-exact verification)
-        run: ctest --test-dir build --output-on-failure
+        run: ./build/npu_tests
 
       - name: Benchmark (performance gate)
-        # 1.5x is a conservative floor; AVX2 should beat the scalar oracle by
-        # far more. The gate is skipped automatically when AVX2 is absent.
         run: NPU_MIN_SPEEDUP=1.5 ./build/npu_bench

@@ -7,8 +7,7 @@
  *   - randomized fuzzing across many lengths (including non-multiples of 16)
  *
  * The AVX2 intrinsics/asm backends are only exercised when the CPU actually
- * supports AVX2 (npu_hw_has_avx2()); executing AVX2 instructions without
- * hardware support would fault, so the guard is both correct and safe.
+ * supports AVX2 (npu_hw_has_avx2()); executing AVX2 without hardware faults.
  * ========================================================================== */
 #include "npu_isa.h"
 #include "npu_ref.h"
@@ -150,6 +149,7 @@ static void test_fuzz(void)
 
 int main(void)
 {
+    setvbuf(stdout, NULL, _IONBF, 0);
     printf("NPU hotspot verification  (AVX2 present: %s)\n",
            npu_hw_has_avx2() ? "yes" : "no");
     test_edge();
