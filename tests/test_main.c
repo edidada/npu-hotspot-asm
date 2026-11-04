@@ -1,5 +1,13 @@
 /* =============================================================================
- * test_main.c - bit-exact verification harness (with crash tracing).
+ * test_main.c - bit-exact verification harness.
+ *
+ * Every optimized backend (dispatch, intrinsics, hand-written assembly) is
+ * checked against the scalar reference oracle for:
+ *   - explicit saturation / overflow edge cases
+ *   - randomized fuzzing across many lengths (including non-multiples of 16)
+ *
+ * The AVX2 intrinsics/asm backends are only exercised when the CPU actually
+ * supports AVX2 (npu_hw_has_avx2()); executing AVX2 without hardware faults.
  * ========================================================================== */
 #include "npu_isa.h"
 #include "npu_ref.h"
@@ -66,14 +74,10 @@ static void test_edge(void)
     {
         int16_t a[1], b[1], c[1], out[1];
         a[0] = 32767;  b[0] = 32767;  c[0] = 0;
-        printf("  edge call 1 (vmac 32767*32767)\n");
         npu_vmac_sat_i16(a, b, c, out, 1);
-        printf("  edge call 1 done out[0]=%d\n", (int)out[0]);
         CHECK(out[0] == 32767, "vmac 32767*32767 sat high");
         a[0] = -32768; b[0] = -32768; c[0] = 0;
-        printf("  edge call 2 (vmac -32768^2)\n");
         npu_vmac_sat_i16(a, b, c, out, 1);
-        printf("  edge call 2 done out[0]=%d\n", (int)out[0]);
         CHECK(out[0] == 32767, "vmac (-32768)^2 sat high");
         a[0] = -300;   b[0] = 200;    c[0] = 0;
         npu_vmac_sat_i16(a, b, c, out, 1);
@@ -145,13 +149,10 @@ static void test_fuzz(void)
 
 int main(void)
 {
-    setvbuf(stdout, NULL, _IONBF, 0);
     printf("NPU hotspot verification  (AVX2 present: %s)\n",
            npu_hw_has_avx2() ? "yes" : "no");
     test_edge();
-    printf("[edge] completed\n");
     test_fuzz();
-    printf("[fuzz] completed\n");
     printf("\n%ld check groups, %d failures\n", g_checks, g_fail);
     if (g_fail != 0) {
         printf("RESULT: FAIL (%d failures)\n", g_fail);

@@ -1,7 +1,9 @@
 /* =============================================================================
  * vadd.sat.i16 - hand-written AVX2 kernel (System V AMD64 ABI).
  *   out[i] = sat_i16( (int32)a[i] + (int32)b[i] )
- * ABI: a=rdi, b=rsi, out=rcx, n=rdx.
+ *
+ * ABI for 4 args: a=rdi, b=rsi, out=rdx, n=rcx.
+ * vpaddsw performs signed saturating addition on packed int16 directly.
  * A scalar tail processes the final <16 elements (bit-exact to the reference).
  * ========================================================================== */
         .intel_syntax noprefix
@@ -12,27 +14,27 @@
         .type   npu_vadd_sat_i16_avx2, @function
 #endif
 npu_vadd_sat_i16_avx2:
-        test    rdx, rdx
+        test    rcx, rcx                /* n */
         jz      .Lvadd_ret
 .Lvadd_loop:
-        cmp     rdx, 16
+        cmp     rcx, 16
         jl      .Lvadd_tail
 
-        vmovdqu ymm0, [rdi]
-        vmovdqu ymm1, [rsi]
+        vmovdqu ymm0, [rdi]             /* a */
+        vmovdqu ymm1, [rsi]             /* b */
         vpaddsw ymm2, ymm0, ymm1
-        vmovdqu [rcx], ymm2
+        vmovdqu [rdx], ymm2             /* out */
 
         add     rdi, 32
         add     rsi, 32
-        add     rcx, 32
-        sub     rdx, 16
+        add     rdx, 32
+        sub     rcx, 16
         jmp     .Lvadd_loop
 
 .Lvadd_tail:
         xor     r9, r9
 .Lvadd_tloop:
-        cmp     r9, rdx
+        cmp     r9, rcx
         jge     .Lvadd_ret
         movsx   r10, word ptr [rdi + r9*2]
         movsx   r11, word ptr [rsi + r9*2]
@@ -43,7 +45,7 @@ npu_vadd_sat_i16_avx2:
         mov     r11, -32768
         cmp     r10, r11
         cmovl   r10, r11
-        mov     word ptr [rcx + r9*2], r10w
+        mov     word ptr [rdx + r9*2], r10w
         inc     r9
         jmp     .Lvadd_tloop
 
