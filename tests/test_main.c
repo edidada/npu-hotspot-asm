@@ -6,9 +6,9 @@
  *   - explicit saturation / overflow edge cases
  *   - randomized fuzzing across many lengths (including non-multiples of 16)
  *
- * A failure here means a backend diverged from the specification and must not
- * ship. This is the heart of the "bit-exact verification" gate from the
- * README.
+ * The AVX2 intrinsics/asm backends are only exercised when the CPU actually
+ * supports AVX2 (npu_hw_has_avx2()); executing AVX2 instructions without
+ * hardware support would fault, so the guard is both correct and safe.
  * ========================================================================== */
 #include "npu_isa.h"
 #include "npu_ref.h"
@@ -33,7 +33,6 @@ static int16_t rnd_i16(void)
     return (int16_t)(rand() & 0xFFFF);
 }
 
-/* Compare `got` against the reference oracle over length n. */
 static void check_vmac(const char *name, const int16_t *a, const int16_t *b,
                        const int16_t *c, const int16_t *got, size_t n)
 {
@@ -73,7 +72,6 @@ static void check_vadd(const char *name, const int16_t *a, const int16_t *b,
 static void test_edge(void)
 {
     printf("[edge] saturation / overflow cases\n");
-    /* vmac.sat.i16 explicit cases */
     {
         int16_t a[1], b[1], c[1], out[1];
         a[0] = 32767;  b[0] = 32767;  c[0] = 0;
@@ -92,7 +90,6 @@ static void test_edge(void)
         npu_vmac_sat_i16(a, b, c, out, 1);
         CHECK(out[0] == 23, "vmac in-range exact");
     }
-    /* vadd.sat.i16 explicit cases */
     {
         int16_t a[1], b[1], out[1];
         a[0] = 32767;  b[0] = 1;
@@ -116,6 +113,7 @@ static void test_fuzz(void)
     int16_t *c = malloc(50000 * sizeof(int16_t));
     int16_t *out = malloc(50000 * sizeof(int16_t));
     int16_t *out2 = malloc(50000 * sizeof(int16_t));
+    int avx2 = npu_hw_has_avx2();
 
     for (size_t li = 0; li < sizeof(lens) / sizeof(lens[0]); li++) {
         size_t n = lens[li];
@@ -125,21 +123,20 @@ static void test_fuzz(void)
                 b[i] = rnd_i16();
                 c[i] = rnd_i16();
             }
-            /* dispatch (production path) */
             npu_vmac_sat_i16(a, b, c, out, n);
             check_vmac("dispatch.vmac", a, b, c, out, n);
             npu_vadd_sat_i16(a, b, out2, n);
             check_vadd("dispatch.vadd", a, b, out2, n);
 
-            /* intrinsics backend (verification target) */
-            npu_vmac_sat_i16_avx2_intrin(a, b, c, out, n);
-            check_vmac("intrin.vmac", a, b, c, out, n);
-            npu_vadd_sat_i16_avx2_intrin(a, b, out2, n);
-            check_vadd("intrin.vadd", a, b, out2, n);
+            if (avx2) {
+                npu_vmac_sat_i16_avx2_intrin(a, b, c, out, n);
+                check_vmac("intrin.vmac", a, b, c, out, n);
+                npu_vadd_sat_i16_avx2_intrin(a, b, out2, n);
+                check_vadd("intrin.vadd", a, b, out2, n);
+            }
 
-            /* hand-written assembly backend (verification target) */
 #if defined(NPU_USE_ASM_KERNELS)
-            if (npu_hw_has_avx2()) {
+            if (avx2) {
                 npu_vmac_sat_i16_avx2(a, b, c, out, n);
                 check_vmac("asm.vmac", a, b, c, out, n);
                 npu_vadd_sat_i16_avx2(a, b, out2, n);
